@@ -1,0 +1,143 @@
+Subject: [PATCH] For intel Wi-Fi cards, force to scan other wireless networks so the drive is able to set the correct region - hostap v2.10
+
+Signed-off-by: ------------- <pgoncalves-developer@protonmail.com>
+---
+Index: src/ap/hostapd.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/ap/hostapd.h b/src/ap/hostapd.h
+--- a/src/ap/hostapd.h	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/src/ap/hostapd.h	(date 1721242433848)
+@@ -632,6 +632,7 @@
+ int hostapd_add_iface(struct hapd_interfaces *ifaces, char *buf);
+ int hostapd_remove_iface(struct hapd_interfaces *ifaces, char *buf);
+ void hostapd_channel_list_updated(struct hostapd_iface *iface, int initiator);
++void hostapd_scan_results_updated(struct hostapd_iface *iface);
+ void hostapd_set_state(struct hostapd_iface *iface, enum hostapd_iface_state s);
+ const char * hostapd_state_text(enum hostapd_iface_state s);
+ int hostapd_csa_in_progress(struct hostapd_iface *iface);
+Index: src/ap/hostapd.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/ap/hostapd.c b/src/ap/hostapd.c
+--- a/src/ap/hostapd.c	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/src/ap/hostapd.c	(date 1721242723664)
+@@ -1544,13 +1544,16 @@
+ 	setup_interface2(iface);
+ }
+ 
+-
+ void hostapd_channel_list_updated(struct hostapd_iface *iface, int initiator)
++{}
++
++
++void hostapd_scan_results_updated(struct hostapd_iface *iface)
+ {
+-	if (!iface->wait_channel_update || initiator != REGDOM_SET_BY_USER)
++	if (!iface->wait_channel_update)
+ 		return;
+ 
+-	wpa_printf(MSG_DEBUG, "Channel list updated - continue setup");
++	wpa_printf(MSG_DEBUG, "Scan results updated - continue setup");
+ 	eloop_cancel_timeout(channel_list_update_timeout, iface, NULL);
+ 	setup_interface2(iface);
+ }
+@@ -1618,7 +1621,8 @@
+ 		if (os_strncmp(previous_country, country, 2) != 0) {
+ 			wpa_printf(MSG_DEBUG, "Continue interface setup after channel list update");
+ 			iface->wait_channel_update = 1;
+-			eloop_register_timeout(5, 0,
++			int timeout = hostapd_scan_region_before_setting_channel(iface, NULL) ? 10 : 5;
++			eloop_register_timeout(timeout, 0,
+ 					       channel_list_update_timeout,
+ 					       iface, NULL);
+ 			return 0;
+Index: src/ap/hw_features.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/ap/hw_features.h b/src/ap/hw_features.h
+--- a/src/ap/hw_features.h	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/src/ap/hw_features.h	(date 1721242232169)
+@@ -20,6 +20,7 @@
+ const char * hostapd_hw_mode_txt(int mode);
+ int hostapd_hw_get_freq(struct hostapd_data *hapd, int chan);
+ int hostapd_hw_get_channel(struct hostapd_data *hapd, int freq);
++int hostapd_scan_region_before_setting_channel(struct hostapd_iface *iface, void *ctx);
+ int hostapd_check_ht_capab(struct hostapd_iface *iface);
+ int hostapd_check_edmg_capab(struct hostapd_iface *iface);
+ int hostapd_check_he_6ghz_capab(struct hostapd_iface *iface);
+Index: src/ap/hw_features.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/ap/hw_features.c b/src/ap/hw_features.c
+--- a/src/ap/hw_features.c	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/src/ap/hw_features.c	(date 1721242232153)
+@@ -42,6 +42,14 @@
+ }
+ 
+ 
++static void ieee80211n_region_scan_complete(struct hostapd_iface *iface)
++{
++	iface->scan_cb = NULL;
++	wpa_printf(MSG_DEBUG, "Region scan completed");
++	hostapd_scan_results_updated(iface);
++}
++
++
+ #ifndef CONFIG_NO_STDOUT_DEBUG
+ static char * dfs_info(struct hostapd_channel_data *chan)
+ {
+@@ -82,6 +90,10 @@
+ 
+ 	if (hostapd_drv_none(hapd))
+ 		return -1;
++
++	if (iface->scan_cb == ieee80211n_region_scan_complete)
++		return -1;
++
+ 	modes = hostapd_get_hw_feature_data(hapd, &num_modes, &flags,
+ 					    &dfs_domain);
+ 	if (modes == NULL) {
+@@ -505,6 +517,34 @@
+ }
+ 
+ 
++int hostapd_scan_region_before_setting_channel(struct hostapd_iface *iface, void *ctx)
++{
++	struct wpa_driver_scan_params params;
++	int ret;
++
++	if (iface->scan_cb == ieee80211n_region_scan_complete)
++		return 0;
++
++	if (iface->conf->hw_mode_set && iface->conf->hw_mode == HOSTAPD_MODE_IEEE80211A)
++		ieee80211n_scan_channels_5g(iface, &params);
++	else
++		ieee80211n_scan_channels_2g4(iface, &params);
++
++	os_memset(&params, 0, sizeof(params));
++	ret = hostapd_driver_scan(iface->bss[0], &params);
++    if (ret == -EBUSY) {
++        wpa_printf(MSG_ERROR,
++                   "Failed to request a scan of neighboring BSSes ret=%d (%s)!",
++                   ret, strerror(-ret));
++		return 0;
++    }
++    if (ret == 0)
++	    iface->scan_cb = ieee80211n_region_scan_complete;
++
++	return 1;
++}
++
++
+ void hostapd_stop_setup_timers(struct hostapd_iface *iface)
+ {
+ 	eloop_cancel_timeout(ap_ht40_scan_retry, iface, NULL);
