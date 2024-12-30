@@ -6,4 +6,4 @@ This page contains a patch so that hostapd is able unlock the 5GHz bands for Int
 My  Hardware:
   Intel NUC with "Intel Corporation Wireless 8265 / 8275 (rev 78)" card
 
-Patch: for hostapd v2.10
+Patch: for hostapd v2.10/2.11
