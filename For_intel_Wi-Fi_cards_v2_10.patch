@@ -9,7 +9,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 ===================================================================
 diff --git a/src/ap/hostapd.h b/src/ap/hostapd.h
 --- a/src/ap/hostapd.h	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
-+++ b/src/ap/hostapd.h	(date 1721242433848)
++++ b/src/ap/hostapd.h	(date 1735330497792)
 @@ -632,6 +632,7 @@
  int hostapd_add_iface(struct hapd_interfaces *ifaces, char *buf);
  int hostapd_remove_iface(struct hapd_interfaces *ifaces, char *buf);
@@ -18,60 +18,22 @@ diff --git a/src/ap/hostapd.h b/src/ap/hostapd.h
  void hostapd_set_state(struct hostapd_iface *iface, enum hostapd_iface_state s);
  const char * hostapd_state_text(enum hostapd_iface_state s);
  int hostapd_csa_in_progress(struct hostapd_iface *iface);
-Index: src/ap/hostapd.c
+Index: src/ap/ap_config.h
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/src/ap/hostapd.c b/src/ap/hostapd.c
---- a/src/ap/hostapd.c	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
-+++ b/src/ap/hostapd.c	(date 1721242723664)
-@@ -1544,13 +1544,16 @@
- 	setup_interface2(iface);
- }
- 
--
- void hostapd_channel_list_updated(struct hostapd_iface *iface, int initiator)
-+{}
-+
-+
-+void hostapd_scan_results_updated(struct hostapd_iface *iface)
- {
--	if (!iface->wait_channel_update || initiator != REGDOM_SET_BY_USER)
-+	if (!iface->wait_channel_update)
- 		return;
- 
--	wpa_printf(MSG_DEBUG, "Channel list updated - continue setup");
-+	wpa_printf(MSG_DEBUG, "Scan results updated - continue setup");
- 	eloop_cancel_timeout(channel_list_update_timeout, iface, NULL);
- 	setup_interface2(iface);
- }
-@@ -1618,7 +1621,8 @@
- 		if (os_strncmp(previous_country, country, 2) != 0) {
- 			wpa_printf(MSG_DEBUG, "Continue interface setup after channel list update");
- 			iface->wait_channel_update = 1;
--			eloop_register_timeout(5, 0,
-+			int timeout = hostapd_scan_region_before_setting_channel(iface, NULL) ? 10 : 5;
-+			eloop_register_timeout(timeout, 0,
- 					       channel_list_update_timeout,
- 					       iface, NULL);
- 			return 0;
-Index: src/ap/hw_features.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
-diff --git a/src/ap/hw_features.h b/src/ap/hw_features.h
---- a/src/ap/hw_features.h	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
-+++ b/src/ap/hw_features.h	(date 1721242232169)
-@@ -20,6 +20,7 @@
- const char * hostapd_hw_mode_txt(int mode);
- int hostapd_hw_get_freq(struct hostapd_data *hapd, int chan);
- int hostapd_hw_get_channel(struct hostapd_data *hapd, int freq);
-+int hostapd_scan_region_before_setting_channel(struct hostapd_iface *iface, void *ctx);
- int hostapd_check_ht_capab(struct hostapd_iface *iface);
- int hostapd_check_edmg_capab(struct hostapd_iface *iface);
- int hostapd_check_he_6ghz_capab(struct hostapd_iface *iface);
+diff --git a/src/ap/ap_config.h b/src/ap/ap_config.h
+--- a/src/ap/ap_config.h	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/src/ap/ap_config.h	(date 1735330548763)
+@@ -957,6 +957,7 @@
+ 	int acs_exclude_dfs;
+ 	u8 min_tx_power;
+ 	enum hostapd_hw_mode hw_mode; /* HOSTAPD_MODE_IEEE80211A, .. */
++	bool hw_mode_set;
+ 	int acs_exclude_6ghz_non_psc;
+ 	enum {
+ 		LONG_PREAMBLE = 0,
 Index: src/ap/hw_features.c
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
@@ -79,7 +41,7 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 ===================================================================
 diff --git a/src/ap/hw_features.c b/src/ap/hw_features.c
 --- a/src/ap/hw_features.c	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
-+++ b/src/ap/hw_features.c	(date 1721242232153)
++++ b/src/ap/hw_features.c	(date 1735330497806)
 @@ -42,6 +42,14 @@
  }
  
@@ -141,3 +103,73 @@ diff --git a/src/ap/hw_features.c b/src/ap/hw_features.c
  void hostapd_stop_setup_timers(struct hostapd_iface *iface)
  {
  	eloop_cancel_timeout(ap_ht40_scan_retry, iface, NULL);
+Index: src/ap/hostapd.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/ap/hostapd.c b/src/ap/hostapd.c
+--- a/src/ap/hostapd.c	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/src/ap/hostapd.c	(date 1735330497782)
+@@ -1544,13 +1544,16 @@
+ 	setup_interface2(iface);
+ }
+ 
+-
+ void hostapd_channel_list_updated(struct hostapd_iface *iface, int initiator)
++{}
++
++
++void hostapd_scan_results_updated(struct hostapd_iface *iface)
+ {
+-	if (!iface->wait_channel_update || initiator != REGDOM_SET_BY_USER)
++	if (!iface->wait_channel_update)
+ 		return;
+ 
+-	wpa_printf(MSG_DEBUG, "Channel list updated - continue setup");
++	wpa_printf(MSG_DEBUG, "Scan results updated - continue setup");
+ 	eloop_cancel_timeout(channel_list_update_timeout, iface, NULL);
+ 	setup_interface2(iface);
+ }
+@@ -1618,7 +1621,8 @@
+ 		if (os_strncmp(previous_country, country, 2) != 0) {
+ 			wpa_printf(MSG_DEBUG, "Continue interface setup after channel list update");
+ 			iface->wait_channel_update = 1;
+-			eloop_register_timeout(5, 0,
++			int timeout = hostapd_scan_region_before_setting_channel(iface, NULL) ? 10 : 5;
++			eloop_register_timeout(timeout, 0,
+ 					       channel_list_update_timeout,
+ 					       iface, NULL);
+ 			return 0;
+Index: src/ap/hw_features.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/ap/hw_features.h b/src/ap/hw_features.h
+--- a/src/ap/hw_features.h	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/src/ap/hw_features.h	(date 1735330497809)
+@@ -20,6 +20,7 @@
+ const char * hostapd_hw_mode_txt(int mode);
+ int hostapd_hw_get_freq(struct hostapd_data *hapd, int chan);
+ int hostapd_hw_get_channel(struct hostapd_data *hapd, int freq);
++int hostapd_scan_region_before_setting_channel(struct hostapd_iface *iface, void *ctx);
+ int hostapd_check_ht_capab(struct hostapd_iface *iface);
+ int hostapd_check_edmg_capab(struct hostapd_iface *iface);
+ int hostapd_check_he_6ghz_capab(struct hostapd_iface *iface);
+Index: hostapd/config_file.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/hostapd/config_file.c b/hostapd/config_file.c
+--- a/hostapd/config_file.c	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
++++ b/hostapd/config_file.c	(date 1735330709950)
+@@ -3139,6 +3139,7 @@
+ 				   line, pos);
+ 			return 1;
+ 		}
++		conf->hw_mode_set = true;
+ 	} else if (os_strcmp(buf, "wps_rf_bands") == 0) {
+ 		if (os_strcmp(pos, "ad") == 0)
+ 			bss->wps_rf_bands = WPS_RF_60GHZ;
