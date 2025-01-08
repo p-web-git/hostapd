@@ -7,3 +7,27 @@ My  Hardware:
   Intel NUC with "Intel Corporation Wireless 8265 / 8275 (rev 78)" card
 
 Patch: for hostapd v2.10/2.11
+
+## Instructions
+
+Download hostapd
+```
+git clone git://w1.fi/hostap.git
+```
+
+Apply patch
+```
+git checkout hostap_2_10
+git apply For_intel_Wi-Fi_cards_v2_10.patch
+```
+
+Build
+```
+cd src
+make -j8
+```
+
+After copying the modifyed version to your system, run the command bellow so that the file doesn't get replaced or delete in case of system updates:
+```
+chattr +i /usr/sbin/hostapd
+```
