@@ -48,6 +48,8 @@ Edit .config file and add:
 CFLAGS += -I/usr/include/libnl3
 CONFIG_IEEE80211AC=y
 CONFIG_IEEE80211AX=y
+CONFIG_SAE=y
+CONFIG_SAE_PK=y
 ```
 
 Finally build hostapd:
