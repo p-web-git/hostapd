@@ -46,6 +46,8 @@ cp defconfig .config
 Edit .config file and add:
 ``` bash
 CFLAGS += -I/usr/include/libnl3
+CONFIG_IEEE80211AC=y
+CONFIG_IEEE80211AX=y
 ```
 
 Finally build hostapd:
