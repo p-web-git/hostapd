@@ -10,9 +10,26 @@ Patch: for hostapd v2.10/2.11
 
 ## Instructions
 
+You will require a few packeges in order to compile hostapd, you can build them yourself or install the binary
+
+``` bash
+apt install pkgconf libnl-genl-3-dev
+```
+
+For openssl it will be a bit more involving
+
+``` bash
+git clone https://github.com/openssl/openssl.git
+cd openssl
+./Configure
+make -j8
+make install
+```
+
 Download hostapd
 ```
 git clone git://w1.fi/hostap.git
+cd hostap
 ```
 
 Apply patch
@@ -21,10 +38,20 @@ git checkout hostap_2_10
 git apply For_intel_Wi-Fi_cards_v2_10.patch
 ```
 
-Build
+``` bash
+cd ./hostapd
+cp defconfig .config
 ```
-cd src
-make -j8
+
+Edit .config file and add:
+``` bash
+CFLAGS += -I/usr/include/libnl3
+```
+
+Finally build hostapd:
+
+```bash
+make build
 ```
 
 After copying the modifyed version to your system, run the command bellow so that the file doesn't get replaced or delete in case of system updates:
