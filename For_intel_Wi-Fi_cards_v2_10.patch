@@ -1,11 +1,5 @@
 Subject: [PATCH] For intel Wi-Fi cards, force to scan other wireless networks so the drive is able to set the correct region - hostap v2.10
 
-Signed-off-by: ------------- <pgoncalves-developer@protonmail.com>
----
-Index: src/ap/hostapd.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
 ===================================================================
 diff --git a/src/ap/hostapd.h b/src/ap/hostapd.h
 --- a/src/ap/hostapd.h	(revision cff80b4f7d3c0a47c052e8187d671710f48939e4)
