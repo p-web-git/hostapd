@@ -1,4 +1,5 @@
 #! /bin/bash
+set -e
 
 ## Don't install anything
 #sudo apt install build-essential pkgconf libnl-genl-3-dev
