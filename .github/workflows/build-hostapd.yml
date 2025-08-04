@@ -6,7 +6,7 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the "master" branch
   push:
-    branches: [ "master" ]
+    branches: [ "test-build-automation" ]
   pull_request:
     branches: [ "master" ]
 
@@ -27,7 +27,7 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Run a one-line script
-        run: echo Hello, world!
+        run: ./build.sh
 
       # Runs a set of commands using the runners shell
       - name: Run a multi-line script
